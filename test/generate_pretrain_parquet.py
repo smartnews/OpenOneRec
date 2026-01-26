@@ -5,7 +5,7 @@ import uuid
 
 import pandas as pd
 
-DESCRIPTION_TEMPLATE = "新闻标题：{title}。摘要：{description}"
+DESCRIPTION_TEMPLATE = "标题：{title}。摘要：{description}"
 PRETRAIN_TEMPLATES = [
     lambda sid, caption: json.dumps({"新闻ID": sid, "新闻内容": caption}, ensure_ascii=False),
     lambda sid, caption: f"新闻{sid} 展示了以下内容：{caption}",
