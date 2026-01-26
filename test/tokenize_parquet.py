@@ -6,7 +6,6 @@ OUTPUT: id, title, description, sid
 
 import argparse
 import os
-from typing import Iterable
 
 import torch
 import pyarrow as pa
@@ -33,21 +32,13 @@ def format_sid(codes: list[int]) -> str:
     return f"<|sid_begin|>{''.join(tags)}<|sid_end|>"
 
 
-def build_text(title: object, description: object) -> str:
-    title_str = "" if title is None else str(title)
-    desc_str = "" if description is None else str(description)
-    return DESCRIPTION_TEMPLATE.format(title=title_str, description=desc_str)
-
-
-def normalize_path(path: str) -> tuple[str, fs.FileSystem | None]:
+def iter_batches(path: str, columns: list[str], batch_size: int):
     if path.startswith("s3://"):
-        return path[len("s3://") :], fs.S3FileSystem()
-    return path, None
-
-
-def iter_batches(path: str, columns: list[str], batch_size: int) -> Iterable[pa.RecordBatch]:
-    norm_path, filesystem = normalize_path(path)
-    dataset = ds.dataset(norm_path, format="parquet", filesystem=filesystem, partitioning="hive")
+        path = path[len("s3://") :]
+        filesystem = fs.S3FileSystem()
+    else:
+        filesystem = None
+    dataset = ds.dataset(path, format="parquet", filesystem=filesystem, partitioning="hive")
     yield from dataset.to_batches(columns=columns, batch_size=batch_size)
 
 
@@ -67,10 +58,9 @@ def load_models() -> tuple[AutoTokenizer, AutoModel, ResKmeans, torch.device, to
     if isinstance(checkpoint, ResKmeans):
         sid_model = checkpoint
     else:
-        state_dict = checkpoint.get("model") if isinstance(checkpoint, dict) else checkpoint
-        if state_dict is None:
-            state_dict = checkpoint.get("state_dict")
-        if state_dict is None:
+        if isinstance(checkpoint, dict):
+            state_dict = checkpoint.get("model") or checkpoint.get("state_dict") or checkpoint
+        else:
             state_dict = checkpoint
         n_layers = sum(1 for k in state_dict.keys() if k.startswith("centroids."))
         codebook_size, dim = state_dict["centroids.0"].shape
@@ -99,11 +89,12 @@ def main() -> None:
     total = 0
     for batch in iter_batches(args.input_path, ["id", "title", "description"], args.batch_size):
         ids = batch.column("id").to_pylist()
-        titles = batch.column("title").to_pylist()
-        descriptions = batch.column("description").to_pylist()
-        descriptions = ["" if desc is None else str(desc) for desc in descriptions]
-
-        texts = [build_text(title, desc) for title, desc in zip(titles, descriptions)]
+        titles = ["" if title is None else str(title) for title in batch.column("title").to_pylist()]
+        descriptions = ["" if desc is None else str(desc) for desc in batch.column("description").to_pylist()]
+        texts = [
+            DESCRIPTION_TEMPLATE.format(title=title, description=desc)
+            for title, desc in zip(titles, descriptions)
+        ]
 
         model_inputs = tokenizer(
             texts,
@@ -112,8 +103,7 @@ def main() -> None:
             truncation=True,
             max_length=args.max_length,
         ).to(model_device)
-        model_output = model(**model_inputs)
-        emb = mean_pool(model_output.last_hidden_state, model_inputs["attention_mask"])
+        emb = mean_pool(model(**model_inputs).last_hidden_state, model_inputs["attention_mask"])
         emb = emb.to(dtype=torch.float32, device=sid_device)
 
         with torch.no_grad():
