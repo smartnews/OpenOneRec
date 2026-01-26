@@ -1,5 +1,8 @@
 """
 python test/tokenize_parquet.py --max_rows 100 --output_path output/id_sid_100.parquet
+
+python test/tokenize_parquet.py --output_path output/id_sid.parquet
+
 INPUT : id, title, description
 OUTPUT: id, title, description, sid
 """
