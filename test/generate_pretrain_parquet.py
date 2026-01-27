@@ -1,3 +1,6 @@
+"""
+python test/generate_pretrain_parquet.py --input output/id_sid.parquet --output output/pretrain.parquet
+"""
 import argparse
 import json
 import random
@@ -5,11 +8,11 @@ import uuid
 
 import pandas as pd
 
-DESCRIPTION_TEMPLATE = "标题：{title}。摘要：{description}"
+DESCRIPTION_TEMPLATE = "タイトル：{title}。要約：{description}"
 PRETRAIN_TEMPLATES = [
-    lambda sid, caption: json.dumps({"新闻ID": sid, "新闻内容": caption}, ensure_ascii=False),
-    lambda sid, caption: f"新闻{sid} 展示了以下内容：{caption}",
-    lambda sid, caption: f"新闻{sid} 的内容完整描述如下：{caption}",
+    lambda sid, caption: json.dumps({"ニュースID": sid, "ニュース内容": caption}, ensure_ascii=False),
+    lambda sid, caption: f"ニュース{sid}には次の内容が含まれます：{caption}",
+    lambda sid, caption: f"ニュース{sid}の内容は以下のとおりです：{caption}",
 ]
 SOURCE_NAME = "RecIF_ItemUnderstand_Pretrain"
 SEED = 42
@@ -25,9 +28,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate pretrain item_understand parquet.")
     parser.add_argument("--input", type=str, required=True, help="Input parquet path")
     parser.add_argument("--output", type=str, required=True, help="Output parquet path")
+    parser.add_argument("--seed", type=int, default=SEED, help="Random seed")
     args = parser.parse_args()
 
-    random.seed(SEED)
+    random.seed(args.seed)
     df = pd.read_parquet(args.input)
 
     records = []
@@ -35,11 +39,14 @@ def main() -> None:
         sid = row.get("sid")
         if sid is None or (isinstance(sid, float) and pd.isna(sid)):
             continue
+        sid = str(sid)
 
         title = row.get("title")
         description = row.get("description")
         title = "" if title is None or (isinstance(title, float) and pd.isna(title)) else str(title)
         description = "" if description is None or (isinstance(description, float) and pd.isna(description)) else str(description)
+        if not title and not description:
+            continue
         caption = DESCRIPTION_TEMPLATE.format(title=title, description=description)
 
         records.append(
