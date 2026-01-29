@@ -9,7 +9,9 @@ MODEL_DIR="OpenOneRec/OneRec-8B"
 OUTPUT_DIR="$ROOT_DIR/output/SN-8B-pretrain"
 DATASET_CONFIG="test/pretrain/pretrain.json"
 
-export WORLD_SIZE=1
+GPU_NUM=1
+
+export WORLD_SIZE=$GPU_NUM
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=29500
 export PYTORCH_ALLOC_CONF=expandable_segments:True  # Reduce CUDA memory fragmentation
@@ -31,9 +33,9 @@ fi
 
 HOSTFILE_SEQ="$OUTPUT_DIR/hostfile_seq"
 if [ -f /etc/mpi/hostfile ]; then
-    sed 's/=1/=8/g' /etc/mpi/hostfile > "$HOSTFILE_SEQ"
+    sed "s/=1/=${GPU_NUM}/g" /etc/mpi/hostfile > "$HOSTFILE_SEQ"
 else
-    echo "localhost slots=1" > "$HOSTFILE_SEQ"
+    echo "localhost slots=$GPU_NUM" > "$HOSTFILE_SEQ"
 fi
 
 nnode=$(wc -l < "$HOSTFILE_SEQ")
@@ -139,9 +141,9 @@ mpirun --allow-run-as-root \
         # --minibatch_size 16384 \
         --minibatch_size 1 \
         --logging_per_step 5 \
+        # --use_fp32_weight \
         --seed 19260817 \
         # --enable_profiler \
-        # --use_fp32_weight \
         --enable_gradient_checkpointing \
         --use_chunked_loss_computer \
     "
