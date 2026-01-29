@@ -12,7 +12,7 @@ DATASET_CONFIG="test/pretrain/pretrain.json"
 export WORLD_SIZE=1
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=29500
-export PYTORCH_ALLOC_CONF=expandable_segments:True
+export PYTORCH_ALLOC_CONF=expandable_segments:True  # Reduce CUDA memory fragmentation
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p /tmp/_wids_cache
@@ -127,7 +127,8 @@ mpirun --allow-run-as-root \
         --model_class Qwen3ForCausalLM \
         --monitor_datasource_loss \
         --monitor_datasource_cnt \
-        --max_length 512 \
+        # --max_length 32768 \
+        --max_length 256 \
         --learning_rate 2e-4 \
         --min_lr 1e-4 \
         --weight_decay 0.1 \
@@ -135,10 +136,12 @@ mpirun --allow-run-as-root \
         --num_warmup_steps 500 \
         --num_training_steps 5000 \
         --save_checkpoint_per_step 50 \
-        --minibatch_size 2 \
+        # --minibatch_size 16384 \
+        --minibatch_size 1 \
         --logging_per_step 5 \
-        --reshard_after_forward \
         --seed 19260817 \
+        # --enable_profiler \
+        # --use_fp32_weight \
         --enable_gradient_checkpointing \
         --use_chunked_loss_computer \
     "
