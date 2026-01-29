@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openonerec-pretrain"
+version = "0.0.0"
+description = "Pretrain tests for OpenOneRec"
+requires-python = ">=3.9"
+dependencies = [
+  "torch==2.10.0+cu128",
+  "torchvision",
+  "torchaudio",
+  "transformers==4.53",
+  "accelerate",
+  "tensorboard",
+  "torchdata",
+  "webdataset",
+  "easydict",
+  "sortedcontainers",
+  "rich",
+]
