@@ -2,7 +2,7 @@
 Inspect tokenization for parquet rows using the training tokenizer.
 
 Examples:
-  python test/text_tokenizer_parquet.py \
+  python test/visualize_text_tokenizer_parquet.py \
     --parquet_path output/split_data_pretrain_rec/part-00000-of-00006.parquet \
     --dataset_config test/pretrain/pretrain.json \
     --max_rows 3
@@ -21,6 +21,7 @@ DEFAULT_PARQUET_PATH = "output/split_data_pretrain_rec/part-00000-of-00006.parqu
 DEFAULT_MAX_ROWS = 3
 DEFAULT_DATASET_CONFIG = "test/pretrain/pretrain.json"
 DEFAULT_MODEL_DIR = None
+DEFAULT_SHOW_TOKENS = True
 
 
 def load_model_dir(model_dir: str | None, dataset_config: str | None) -> str:
@@ -69,6 +70,12 @@ def main() -> None:
         default=DEFAULT_DATASET_CONFIG,
         help="Dataset config for base_model_dir fallback",
     )
+    parser.add_argument(
+        "--show_tokens",
+        action="store_true",
+        default=DEFAULT_SHOW_TOKENS,
+        help="Print per-token id/token/decoded output",
+    )
     args = parser.parse_args()
 
     model_dir = load_model_dir(args.model_dir, args.dataset_config)
@@ -77,6 +84,8 @@ def main() -> None:
     table = pq.read_table(args.parquet_path)
     rows = table.to_pylist()
 
+    max_id_width = len(str(tokenizer.vocab_size - 1))
+
     for i, row in enumerate(rows[: args.max_rows]):
         text = extract_text(row)
         if not text:
@@ -84,16 +93,12 @@ def main() -> None:
             continue
         encoded = tokenizer(text, add_special_tokens=False)
         ids: List[int] = encoded["input_ids"]
-        tokens: List[str] = tokenizer.convert_ids_to_tokens(ids)
-        reconstructed = tokenizer.convert_tokens_to_string(tokens)
-        decoded = tokenizer.decode(ids, clean_up_tokenization_spaces=False)
-
         print(f"[row {i}] text:\n{text}\n")
-        print(f"[row {i}] reconstructed:\n{reconstructed}\n")
-        print(f"[row {i}] decoded:\n{decoded}\n")
-        print(f"[row {i}] tokens (id -> token):")
-        for idx, (tid, tok) in enumerate(zip(ids, tokens)):
-            print(f"{idx:04d}: {tid}\t{tok}")
+        if args.show_tokens:
+            print(f"[row {i}] tokens (id -> decoded):")
+            for idx, tid in enumerate(ids):
+                decoded_token = tokenizer.decode([tid], clean_up_tokenization_spaces=False)
+                print(f"{idx:04d}: {tid:>{max_id_width}}  {repr(decoded_token)}")
         print("=" * 80)
 
 
